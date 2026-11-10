@@ -1,0 +1,28 @@
+# Local datasets, generated segmentations and cached features
+/data/*
+!/data/README.md
+!/data/prepare_realiad.py
+!/data/prepare_visa.py
+
+# Model weights
+/ckpt/*
+!/ckpt/README.md
+*.pth
+*.pt
+*.pkl
+
+# Generated experimental outputs and local UI caches
+/saved_results/
+/saved_results_restart/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Local environment and editor settings
+.env
+.env.*
+.vscode/
+.idea/
