@@ -19,9 +19,9 @@ from utils.utils import setup_seed, get_dinov3_weight_name
 
 ROOT = Path(__file__).resolve().parent
 CATEGORY = os.environ.get('LOGICO_AB_CATEGORY', 'breakfast_box')
-OUT = ROOT / 'saved_results' / ('breakfast_ab' if CATEGORY == 'breakfast_box' else 'ab_' + CATEGORY)
+OUT = Path(os.environ.get('LOGICO_AB_OUT', ROOT / 'saved_results' / ('breakfast_ab' if CATEGORY == 'breakfast_box' else 'ab_' + CATEGORY)))
 SAVE = 'saved_results_restart' if CATEGORY == 'juice_bottle' else 'saved_results'
-CKPT = ROOT / SAVE / 'mvtec_loco' / CATEGORY / 'LogiCo_best_ckpt.pkl'
+CKPT = Path(os.environ.get('LOGICO_AB_CKPT', ROOT / SAVE / 'mvtec_loco' / CATEGORY / 'LogiCo_best_ckpt.pkl'))
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
@@ -67,7 +67,7 @@ def main():
     metrics = compute_imagewise_log_metrics([r['score_A'] for r in rows], [r['label'] for r in rows], [r['image_path'] for r in rows])
     with CKPT.open('rb') as f:
         sha=hashlib.file_digest(f, 'sha256').hexdigest()
-    summary = dict(checkpoint=str(CKPT), checkpoint_sha256=sha, batch_size=2, seed=1, count=len(rows), image_metrics=metrics, image_score='A top 0.5% mean after 256x256 interpolation', maps='native raw CRN/SRN/SMD; A/B gaussian-smoothed then interpolated 256x256', selected_on_test=True)
+    summary = dict(checkpoint=str(CKPT), checkpoint_sha256=sha, batch_size=2, seed=1, count=len(rows), image_metrics=metrics, image_score='A top 0.5% mean after 256x256 interpolation', maps='native raw CRN/SRN/SMD; A/B gaussian-smoothed then interpolated 256x256', selected_on_test=CKPT.name == 'LogiCo_best_ckpt.pkl')
     (OUT / 'inference.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     print(json.dumps(summary, indent=2), flush=True)
 
