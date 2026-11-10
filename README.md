@@ -1,4 +1,6 @@
 # LogiCo
+基于 LogiCo 寻找创新性。
+
 Official implementation of ["LogiCo: A Unified Framework for Logical and Structural Anomaly Detection (ECCV 2026)"](https://arxiv.org/abs/2606.28688)  
 
 
