@@ -26,6 +26,15 @@ async function update(){try{let d=await(await fetch('/api/status',{cache:'no-sto
 </script></body></html>'''
 
 PAGE = PAGE.replace('<p id="previewmsg">', '<p id="prediction"></p><p class="note">分数越高表示模型认为异常程度越高；这里不设置正常或异常的判断阈值。</p><p id="previewmsg">')
+PAGE = PAGE.replace('定位 sPRO 未包含在本次原版测试中。', 'AU-sPRO 来自此前的 A/B 定位实验，FPR 上限为 5%，采用同类别最佳权重；A 为原版，B 去掉 SMD 热图。')
+PAGE = PAGE.replace('async function update(){', '''function renderSpro(data){
+  if(!data)return '<hr><span class="note">AU-sPRO：暂无结果</span>';
+  let result='<hr><strong>AU-sPRO（FPR ≤ 5%）</strong>';
+  for(const variant of ['A','B']){let v=data[variant];result+=v?`<br>${variant}：逻辑 ${v[0]}% / 结构 ${v[1]}% / 平均 ${v[2]}%`:`<br>${variant}：暂无结果`;}
+  return result;
+}
+async function update(){''')
+PAGE = PAGE.replace(":'等待结果'}</div></div>", ":'等待结果'}${renderSpro(x.spro)}</div></div>")
 PAGE = PAGE.replace("document.getElementById('threshold').oninput=e=>{localStorage.setItem('logico_threshold_'+selected,e.target.value);updatePrediction()};", '')
 PAGE = PAGE.replace('原图 / 异常热图 / 标注。选择标注仅切换显示，不会重新计算指标。', '原图 → GT → A 热力图 → B 热力图 → SMD 热力图 → A、B 二值图。切换标注仅改变 GT 显示，不重新计算指标。')
 PAGE = PAGE.replace('<img id="preview" alt="测试图像、异常热图和标注">', '''<p class="note">A/B 热图按当前图片共同色标显示；SMD 显示原始 sigmoid（0–1）。二值图使用对应类别诊断的约 1% FPR 工作点，阈值取自测试集，仅供诊断；尚未计算的数据会标明。</p><div class="panel-grid" id="panels"></div>''')
@@ -51,6 +60,20 @@ def image_scores(cat):
             with path.open(encoding='utf-8', newline='') as stream:
                 return {row['defect_type'] + '/' + Path(row['image_path']).name: float(row['score_A']) for row in csv.DictReader(stream)}
     return {}
+
+def spro_results(cat):
+    folder = 'breakfast_ab' if cat == 'breakfast_box' else 'ab_' + cat
+    path = ROOT / 'saved_results' / folder / 'spro_results.json'
+    try:
+        variants = json.loads(path.read_text(encoding='utf-8'))['variants']
+        result = {}
+        for name in ('A', 'B'):
+            if name in variants:
+                item = variants[name]
+                result[name] = [f"{float(item[key]) * 100:.2f}" for key in ('logical_au_spro', 'structural_au_spro', 'mean_au_spro')]
+        return result or None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 def annotations_for(cat, image):
     folder = ROOT / 'data' / 'mvtec_loco' / cat / 'ground_truth' / image.parent.name / image.stem
@@ -133,7 +156,7 @@ def status():
             p = re.findall(r'(?:Testing|Saving vis results|Extract Aggregate Features)[^\r\n]*', text)
             if p: progress = p[-1][-180:]
         is_unstarted = cat == 'splicing_connectors' and not done and cat != current and not path.exists()
-        items.append(dict(name=cat, status='已完成' if done else ('训练中' if cat == 'splicing_connectors' and fifth_training else '训练失败' if cat == 'splicing_connectors' and fifth_failed else '未训练、未测试' if is_unstarted else '测试失败' if stopped and cat == current else '测试中' if cat == current else '等待中'), metrics=matches[-1] if matches else None, preview=bool(images_for(cat))))
+        items.append(dict(name=cat, status='已完成' if done else ('训练中' if cat == 'splicing_connectors' and fifth_training else '训练失败' if cat == 'splicing_connectors' and fifth_failed else '未训练、未测试' if is_unstarted else '测试失败' if stopped and cat == current else '测试中' if cat == current else '等待中'), metrics=matches[-1] if matches else None, spro=spro_results(cat), preview=bool(images_for(cat))))
     if current and f'Finished {current}' in lines:
         current = None
     summary = '五类测试全部完成' if complete else '第五类训练中，完成后自动测试' if fifth_training else '第五类训练失败，请查看训练日志' if fifth_failed else '本次四类测试完成，第五类等待训练' if four_complete and not current else '测试已停止' if stopped else '准备中'
