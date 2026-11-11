@@ -97,7 +97,19 @@ def main():
         for mode in ['fixed','full','masked']:
             rows=[r for r in allrows if r['category']==category and r['mode']==mode]
             image_means=[np.mean([r['error'] for r in rows if r['image']==image]) for image in sorted({r['image'] for r in rows})]
-            summary[category][mode]=dict(images=len(image_means),queries=len(rows),mean_image_error=float(np.mean(image_means)),empty_observed=sum(r['observed_count']==0 for r in rows))
+            summary[category][mode]=dict(images=len(image_means),queries=len(rows),mean_image_error=float(np.mean(image_means)),empty_observed=sum(r['observed_count']==0 for r in rows),
+                valid_query_fraction=float(np.mean([r['observed_count']>0 for r in rows])))
+        paired={}
+        for other in ['fixed','full']:
+            local=[r for r in allrows if r['category']==category]
+            images=sorted({r['image'] for r in local})
+            diffs=np.asarray([np.mean([r['error'] for r in local if r['image']==image and r['mode']=='masked'])-
+                              np.mean([r['error'] for r in local if r['image']==image and r['mode']==other]) for image in images])
+            rng=np.random.default_rng(1)
+            sampled=diffs[rng.integers(0,len(diffs),(2000,len(diffs)))].mean(axis=1)
+            paired[other]=dict(mean_masked_minus_control=float(diffs.mean()),
+                               image_bootstrap_95_percentile_interval=[float(x) for x in np.quantile(sampled,[.025,.975])])
+        summary[category]['paired_image_differences']=paired
     (OUT/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
     print(json.dumps(summary,indent=2))
 
