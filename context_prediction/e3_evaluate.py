@@ -50,6 +50,17 @@ def distance(query,bank,visible):
     return sorted(scores)
 
 
+def tile_distances(query, bank_features, bank_labs):
+    visual=np.clip((1-np.sum(bank_features*query['tile_features'][None,:,:],axis=2))/2,0,1)
+    color=np.clip(np.linalg.norm(bank_labs-query['tile_lab'][None,:,:],axis=2)/100,0,1)
+    return .8*visual+.2*color
+
+
+def best_ids(distances, names, visible):
+    means=distances[:,visible].mean(axis=1)
+    return [names[i] for i in np.lexsort((names,means))[:5]]
+
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True); allrows=[]; interventions=[]
     for category in ['splicing_connectors','juice_bottle']:
@@ -60,6 +71,9 @@ def main():
         if len(train)!=expected_train or len(validation)!=expected_val:
             raise RuntimeError(f'{category} cache incomplete: train {len(train)}/{expected_train}, val {len(validation)}/{expected_val}')
         bank=[(p,read(p)) for p in train]; lookup={p.name:d for p,d in bank}
+        names=np.asarray([p.name for p,_ in bank])
+        bank_features=np.stack([d['tile_features'] for _,d in bank])
+        bank_labs=np.stack([d['tile_lab'] for _,d in bank])
         mean_features=np.mean(np.stack([d['tile_features'] for _,d in bank]),axis=0)
         ranked=sorted((float(np.linalg.norm(d['tile_features']-mean_features)),p.name) for p,d in bank)
         fixed=[ranked[i][1] for i in np.linspace(0,len(ranked)-1,5,dtype=int)]
@@ -68,16 +82,18 @@ def main():
         vals=[(p,read(p)) for p in validation[len(validation)//2:]]
         for index,(path,source) in enumerate(vals):
             donorpath,donor=vals[(index+1)%len(vals)]
-            full=[x[1] for x in distance(source,bank,list(range(16)))[:5]]
+            source_distances=tile_distances(source,bank_features,bank_labs)
+            donor_distances=tile_distances(donor,bank_features,bank_labs)
+            full=best_ids(source_distances,names,list(range(16)))
             for name,hidden,box in queries():
                 visible=[i for i in range(16) if i not in hidden]
-                masked=[x[1] for x in distance(source,bank,visible)[:5]]
+                masked=best_ids(source_distances,names,visible)
                 modes={'fixed':fixed,'full':full,'masked':masked}
                 for mode,ids in modes.items():
                     errs=[error(lookup[id],source,box) for id in ids]
                     allrows.append(dict(category=category,image=path.stem,query=name,mode=mode,error=float(np.median(errs)),
                                         observed_count=len(indices(source,box)),reference_ids=';'.join(ids)))
-                donor_ids=[x[1] for x in distance(donor,bank,visible)[:5]]
+                donor_ids=best_ids(donor_distances,names,visible)
                 before_src=np.median([error(lookup[id],source,box) for id in masked])
                 before_donor=np.median([error(lookup[id],donor,box) for id in masked])
                 after_src=np.median([error(lookup[id],source,box) for id in donor_ids])
