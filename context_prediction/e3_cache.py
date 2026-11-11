@@ -10,7 +10,8 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 from torchvision.transforms import functional as TF
-from context_prediction.proposal_audit import ROOT, WEIGHT, EXPECTED_SHA, select_masks
+from context_prediction.proposal_audit import ROOT, WEIGHT, EXPECTED_SHA
+from context_prediction.fast_mask_selection import select_masks_fast
 from context_prediction.tile_isolation import encode_tiles, MEAN, STD
 from dinov3.hub.backbones import load_dinov3_model
 from sam2.build_sam import build_sam2
@@ -62,7 +63,7 @@ def main():
                 resized=source.resize((round(source.width*scale),round(source.height*scale)),Image.Resampling.BILINEAR)
                 rgb=np.array(resized); h,w=rgb.shape[:2]
                 with torch.inference_mode(),torch.autocast('cuda',dtype=torch.bfloat16): proposals=gen.generate(rgb)
-                selected=select_masks(proposals,h,w)
+                selected=select_masks_fast(proposals,h,w)
                 lab=cv2.cvtColor(rgb,cv2.COLOR_RGB2LAB).astype(np.float32); lab[...,0]*=100/255; lab[...,1:]-=128
                 masks=[]; centers=[]; areas=[]; colors=[]; crops=[]; qualities=[]
                 for p,idx,area,bbox in selected:
