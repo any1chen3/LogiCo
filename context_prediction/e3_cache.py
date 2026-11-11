@@ -30,7 +30,10 @@ def main():
     ap.add_argument('--categories',nargs='+',default=['splicing_connectors','juice_bottle'])
     ap.add_argument('--splits',nargs='+',default=['train','validation'])
     ap.add_argument('--limit',type=int,default=0)
+    ap.add_argument('--shards',type=int,default=1)
+    ap.add_argument('--shard-index',type=int,default=0)
     args=ap.parse_args()
+    if args.shards < 1 or not 0 <= args.shard_index < args.shards: raise ValueError('invalid shard')
     if digest(WEIGHT)!=EXPECTED_SHA: raise RuntimeError('SAM checkpoint hash mismatch')
     OUT.mkdir(parents=True,exist_ok=True)
     config=dict(version=1,sam_sha256=EXPECTED_SHA,dino_sha256=digest(DINO),grid=32,points_per_batch=8,
@@ -48,6 +51,7 @@ def main():
         for split in args.splits:
             paths=sorted((ROOT/'data/mvtec_loco'/category/split/'good').glob('*.png'))
             if args.limit: paths=paths[:args.limit]
+            paths=paths[args.shard_index::args.shards]
             for number,path in enumerate(paths,1):
                 dest=OUT/category/split/(path.stem+'.npz')
                 src_hash=digest(path)

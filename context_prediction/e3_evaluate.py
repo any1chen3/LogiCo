@@ -53,7 +53,8 @@ def distance(query,bank,visible):
 def main():
     OUT.mkdir(parents=True,exist_ok=True); allrows=[]; interventions=[]
     for category in ['splicing_connectors','juice_bottle']:
-        train=sorted((CACHE/category/'train').glob('*.npz')); validation=sorted((CACHE/category/'validation').glob('*.npz'))
+        train=sorted(p for p in (CACHE/category/'train').glob('*.npz') if not p.name.endswith('.tmp.npz'))
+        validation=sorted(p for p in (CACHE/category/'validation').glob('*.npz') if not p.name.endswith('.tmp.npz'))
         expected_train=len(list((ROOT/'data/mvtec_loco'/category/'train/good').glob('*.png')))
         expected_val=len(list((ROOT/'data/mvtec_loco'/category/'validation/good').glob('*.png')))
         if len(train)!=expected_train or len(validation)!=expected_val:
