@@ -17,7 +17,7 @@ from dinov3.hub.backbones import load_dinov3_model
 CATEGORY='splicing_connectors'
 DATA=ROOT/'data/mvtec_loco'/CATEGORY
 SEG=ROOT/'data/mvtec_loco_segmentations'/CATEGORY
-OUT=ROOT/'saved_results/context_e4_two_image_precheck'
+OUT=ROOT/'saved_results/context_e4_two_image_precheck_display_fix'
 CHECKPOINT=ROOT/'saved_results/mvtec_loco'/CATEGORY/'LogiCo_best_ckpt.pkl'
 NAMES=['blue cable','yellow cable','red cable','connector','grid']
 
@@ -114,6 +114,7 @@ def main():
       'windows':'E3 16 small and 4 large; component centroid assignment, 256x256 clip; max over windows',
       'vote':'5 per-reference missing masks average; matched missing=expected minus 2px dilation of matched observed',
       'normal_selection':'validation/good/000 visually has similar multi-lever connectors; missing cable color not known',
+      'observed_display':'full union of actual component masks, independent of window assignment; matching and evidence retain the original per-window rule',
       'samples':{}}
     for sample_id,image_path,seg_path in samples:
         # Retrieval uses only independently encoded RGB tiles, before segmentations are read.
@@ -126,14 +127,12 @@ def main():
             retrieval.append((name,box,best_ids(distances,names,visible)))
         observed,seg=component_set(image_path,seg_path,model)
         out_expected=np.zeros((256,256),np.float32); out_observed=np.zeros((256,256),np.float32); evidence=np.zeros((256,256),np.float32)
+        for component in observed: out_observed=np.maximum(out_observed,component['mask'])
         logs=[]
         for name,box,refs in retrieval:
             x1,y1,x2,y2=[int(round(z*256)) for z in box]
             clip=np.zeros((256,256),bool); clip[y1:y2,x1:x2]=True
             visible_observed=in_box(observed,box)
-            obs_union=np.zeros((256,256),bool)
-            for item in visible_observed: obs_union |= item['mask'] & clip
-            out_observed=np.maximum(out_observed,obs_union)
             votes=[]; occupancy=[]; detail=[]
             for ref in refs:
                 stem=Path(ref).stem
