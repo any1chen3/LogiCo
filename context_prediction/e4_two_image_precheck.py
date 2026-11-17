@@ -26,13 +26,13 @@ def digest(path):
     with path.open('rb') as f: return hashlib.file_digest(f,'sha256').hexdigest()
 
 
-def component_set(image_path, segmentation_path, model):
+def component_set(image_path, segmentation_path, model, class_ids=range(4)):
     """Connected components in original class map; background class omitted."""
     with Image.open(image_path) as im: rgb=np.asarray(im.convert('RGB').resize((256,256),Image.Resampling.BILINEAR))
     with Image.open(segmentation_path) as im: seg=np.asarray(im.resize((256,256),Image.Resampling.NEAREST))
     lab=cv2.cvtColor(rgb,cv2.COLOR_RGB2LAB).astype(np.float32); lab[:,:,0]*=100/255; lab[:,:,1:]-=128
     items=[]; crops=[]
-    for cls in range(4):
+    for cls in class_ids:
         n, labels, stats, centroids=cv2.connectedComponentsWithStats(np.uint8(seg==cls),8)
         for index in range(1,n):
             x,y,w,h,area=stats[index]
